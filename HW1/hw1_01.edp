@@ -1,0 +1,2 @@
+mesh Th = square(30,40,[0 + 3*x, 0 + 4*y]);
+plot(Th);

@@ -1,0 +1,19 @@
+verbosity=0.;
+real Dx=.02,Dy=.02;
+mesh Th=square(floor(3./Dx),floor(4./Dy));
+fespace Vh(Th,P1);
+Vh uh,vh,uh0=10.;
+real ue = 4., mu = 1., alpha=.001, dt=0.01, Tf=10. ;
+func f=[sin(pi*x)*sin(2*pi*y)];
+macro Grad(u)[dx(u),dy(u)]//
+problem chaleur(uh,vh) = int2d(Th)(uh*vh/dt +  Grad(uh)'*Grad(vh)*mu) - int2d(Th)(uh0*vh/dt + f*vh) 
+                + int1d(Th,2,3)(uh*vh*alpha) - int1d(Th,2,3)(ue*vh*alpha) 
+                + on(1,4,uh=ue);
+int kk=0;
+for (real t=0.;t<Tf;t+=dt) {
+    chaleur;
+    uh0=uh;
+    if ( !(kk % 20))    
+        plot(uh,cmm="t="+t+"[sec]",dim=2,fill=true,value=true,wait=1); 
+    kk+=1;
+}

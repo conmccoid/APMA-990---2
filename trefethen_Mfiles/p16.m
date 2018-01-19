@@ -4,7 +4,7 @@
   N = 24; [D,x] = cheb(N); y = x;
   [xx,yy] = meshgrid(x(2:N),y(2:N));
   xx = xx(:); yy = yy(:);       % stretch 2D grids to 1D vectors
-  f = 10*sin(8*xx.*(yy-1));
+  f = abs(xx-yy);
   D2 = D^2; D2 = D2(2:N,2:N); I = eye(N-1);
   L = kron(I,D2) + kron(D2,I);                       % Laplacian 
   figure(1), clf, spy(L), drawnow
