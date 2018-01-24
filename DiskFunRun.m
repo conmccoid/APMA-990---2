@@ -2,14 +2,30 @@
 
 % Laplace on disk
 
-% Problem parameters
-N = 24; % dimension in r
-M = 24; % dimension in t
-r = linspace(0,1,N);
-t = linspace(0,2*pi,M);
+% RHS
+f = @(t,r) 0;
 
-gk = @(t,k) cos(k.*t)./(k.*(k-1)); % pieces of BC
+% Exact solution
+UUk = @(t,r,k) (r.^k).*cos(k*t)/(k*(k-1));
+UU = @(t,r) 0;
+for k = 2:100
+    UU = @(t,r) UU(t,r) + UUk(t,r,k);
+end
+% UU = @(t,r) (r.^2).*cos(2*t)/2 + (r.^3).*cos(3*t)/6 + (r.^4).*cos(4*t)/12;
+uu = diskfun(UU,'polar');
 
-% [tt,kk] = meshgrid(2:100,t);
-% G = gk(tt,kk);
-% g = G*ones(99,1);
+% BC
+g = @(t) UU(t,1);
+
+% Solution
+    % f is the RHS function, g is the Dirichlet BC, last entries is number of
+    % points; f and g can be function handles in polar coord.s or
+    % matrix/vector evaluated on the grid [-pi,pi]x[0,1]
+u = diskfun.poisson( f, g, 100 );
+
+figure(1)
+surf(u)
+figure(2)
+surf(uu)
+figure(3)
+surf(uu - u)

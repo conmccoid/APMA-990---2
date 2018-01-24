@@ -43,7 +43,8 @@
   % Reshape
   u = reshape(u,M,N2+1);
   u = u([M 1:M],:);
+  mesh(xx,yy,u)
   
   uu = reshape(uu,M,N2+1);
   uu = uu([M 1:M],:);
-  mesh(xx,yy,abs(uu - u))
+%   mesh(xx,yy,abs(uu - u))
