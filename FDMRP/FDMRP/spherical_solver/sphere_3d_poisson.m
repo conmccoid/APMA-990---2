@@ -1,0 +1,472 @@
+function [rs thetas phis u xs ys zs relres iter resvec] = sphere_3d_poisson(R_max,num_rs,num_thetas,num_phis,ref_rs,ref_thetas,ref_phis,DiriBC,NeuBC,forcing,useiter)
+%   sphere_3d_poisson - solve Poisson's equation in 3d spherical coordinates
+%
+%   [rs thetas phis u xs ys zs relres iter resvec] = sphere_3d_poisson(R_max,num_rs,num_thetas,num_phis,ref_rs,ref_thetas,ref_phis,DiriBC,NeuBC,forcing,useiter)
+%   is used to solve the boundary value problem in spherical coordinates in a spherical domain. 
+%   A large system of equations is solved using the matrix equation where the system of 
+%   equations is composed of one equation for every point in the domain. Note: Dirichlet 
+%   Boundary Conditions overwrite Neumann Boundary Conditions! ie) Dirichlet BC at phi=pi 
+%   that is not set to NaN in the DiriBC function will overwrite a Neumann BC at phi=pi that 
+%   is set by the NeuBC function.
+%
+% INPUTS:
+%   -R_max is the radius of the circle
+%
+%   -num_rs is the number of points to take in radius r
+%
+%   -num_thetas is the number of points to take in zenith angle theta
+%
+%   -num_phis is the number of points to take in azimuth angle phi
+%
+%   -ref_rs is the function that defines the location of points in r. It
+%   must be passed as a string ex) 'r_refine_function' (with quotes)
+%
+%   -ref_thetas is the function that defines the location of points in phi. It
+%   must be passed as a string ex) 'theta_refine_function' (with quotes)
+%
+%   -ref_phis is the function that defines the location of points in phi. It
+%   must be passed as a string ex) 'phi_refine_function' (with quotes)
+%   
+%   -DiriBC is a function that generates the Dirichlet Boundary Conditions. It
+%   is passed as a string ex) 'dirichlet_boundary' (with quotes)
+%   
+%   -NeuBC is a function that generates the Neumann Boundary Conditions. It
+%   is passed as a string ex) 'neumann_boundary' (with quotes)
+%
+%   -forcing is a function that generates the forcing term. It is passed as a 
+%   string ex) 'forcing' (with quotes)
+%
+%   -useiter is an optional parameter. If not set, it defaults to 1 meaning
+%   an iterative method is used to solve the matrix equation. Setting the value to 0
+%   tells the solver to use mldivide.
+%
+% OUTPUTS
+%   xs ys and zs are the cartesian coordinates for the u values at the outside of the sphere, rs, thetas, and phis are 
+%   the spherical coordinates for all the u values.
+% 
+%   if useiter=0, the iterative solver is used and relres final residual, iter 
+%   is the number of iterations needed, and resvec is a vector of the history of 
+%   the residual
+%
+% Run example
+%   [rs thetas phis u xs ys zs] = sphere_3d_poisson(1,25,25,50,'r_refine_function','theta_refine_function','phi_refine_function','dirichlet_boundary','neumann_boundary','forcing');
+%   figure(10),surf(squeeze(xs(end,:,:)),squeeze(ys(end,:,:)),squeeze(zs(end,:,:)),squeeze(u(end,:,:))),colorbar
+
+%   Ashton S. Reimer & Alexei F. Cheviakov
+%   Copyright 2011
+%   Permission is granted to copy, distribute and/or modify this document
+%   under the terms of the GNU General Public License, Version 3.0
+%   or any later version published by the Free Software Foundation;
+%   with no Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+
+%   $Version: 1.0 $  $Date: 2011/08/22 02:16 $
+
+if ( nargin < 11 || isempty(useiter) )
+    useiter=1;
+end
+
+    tic;                                %start timer
+    N=num_phis;                         %number of points in phi
+    M=num_thetas;                       %number of points in theta
+    O=num_rs;                           %number of points in r
+    phi=((1:1:N)-1)/(N)*2*pi;           %points used to calculate space step in phi
+    theta=((1:1:M)-1)/(M-1)*pi;         %points used to calculate space step in theta
+    r=((1:1:O)-1)/(O-1)*R_max;          %points used to calculate space step in r
+
+% *************************************************************************
+% DEFINE POINT LOCATIONS
+    
+    ref_r_handle=str2func(ref_rs);              %define handler for ref_rs function
+    ref_theta_handle=str2func(ref_thetas);      %define handler for ref_thetas function
+    ref_phi_handle=str2func(ref_phis);          %define handler for ref_phis function
+    rs=ref_r_handle(r);                         %call ref_rs function
+    thetas=ref_theta_handle(theta);             %call ref_thetas function
+    phis=ref_phi_handle(phi);                   %call ref_phis function
+    
+% *************************************************************************
+% CHANGE THESE TO ALTER THE SPACE STEP.             
+
+%Initialize arrays to hold space steps
+    hphi=zeros(N-1,1);
+    htheta=zeros(M-1,1);
+    hr=zeros(O-1,1);
+%Calculate the space steps in phi
+    for i=1:1:N-1
+        hphi(i)=phis(i+1)-phis(i);
+    end
+%and in theta
+    for j=1:1:M-1
+        htheta(j)=thetas(j+1)-thetas(j);
+    end
+%and in r
+    for k=1:1:O-1
+        hr(k)=rs(k+1)-rs(k);
+    end
+
+% *************************************************************************
+
+    P=N*M*O;                                %P is total number of points in grid
+    R=zeros(P,1);                           %R is a vector for A*x=R
+    A=sparse(P,P);                          %A matrix initialization for A*x=R
+
+% *************************************************************************
+% FORCING
+
+    forcing_handle=str2func(forcing);       %define forcing function handle
+    f_mat=forcing_handle(phis,thetas,rs);   %call forcing function
+    f=reshape(f_mat,P,1);                   %convert f_mat matrix into column vector f
+
+    disp(['Forcing Calculated in ',num2str(toc)]);
+% *************************************************************************
+
+    disp(['Setting up A matrix']);
+
+% *************************************************************************
+% SET UP THE A MATRIX FOR MATRIX EQUATION A*x=R   
+
+    %***********
+    %First we are going to generate the coefficients for the matrix
+    %elements as dictated by the finite-difference equation
+    %***********
+    % 1) INSIDE 0<=phi<=2pi, 0<theta<pi, 0<r<R_max
+    
+    %Initialize index variables    
+    ind=0;                      %index variables (locations to place
+    PP=N*(O-2)*(M-2);           %coefficient variables)
+    I_000=zeros(PP,1);
+    I_p00=zeros(PP,1);
+    I_m00=zeros(PP,1);
+    I_0p0=zeros(PP,1);
+    I_0m0=zeros(PP,1);
+    I_00p=zeros(PP,1);
+    I_00m=zeros(PP,1);
+    %Initialize coefficient variables
+    r=zeros(PP,1);
+    theta=zeros(PP,1);
+    w=zeros(PP,1);
+    A_p=zeros(PP,1);
+    A_m=zeros(PP,1);
+    B_p=zeros(PP,1);
+    B_m=zeros(PP,1);
+    C_p=zeros(PP,1);
+    C_m=zeros(PP,1);
+
+    for k=2:1:O-1
+        for j=2:1:M-1
+            for i=1:1:N
+                ind=ind+1;
+                hr_k=hr(k);                                 %r space step at k
+                hr_km1=hr(k-1);                             %r space step at k-1
+                htheta_j=htheta(j);                         %theta space step at j
+                htheta_jm1=htheta(j-1);                     %theta space step at j-1
+                if(i==N)
+                    I_p00(ind)=1+(j-1)*N+(k-1)*N*M;         %Makes an index for upper diagonal nearest main
+                    hphi_i=hphi(i-1);                       %phi space step at i-1
+                else
+                    I_p00(ind)=i+1+(j-1)*N+(k-1)*N*M;       %Makes an index for upper diagonal nearest main
+                    hphi_i=hphi(i);                         %phi space step at i
+                end 
+                if(i==1)
+                    I_m00(ind)=N+(j-1)*N+(k-1)*N*M;         %Makes an index for lower diagonal nearest main
+                    hphi_im1=hphi(i);                       %phi space step at i
+                else
+                    I_m00(ind)=i-1+(j-1)*N+(k-1)*N*M;       %Makes an index for lower diagonal nearest main
+                    hphi_im1=hphi(i-1);                     %phi space step at i-1
+                end
+                %Indicies
+                I_000(ind)=i+(j-1)*N+(k-1)*N*M;             %Main diagonal index
+                I_0p0(ind)=i+(j)*N+(k-1)*N*M;               %First upper interaction layer index
+                I_0m0(ind)=i+(j-2)*N+(k-1)*N*M;             %First lower interaction layer index
+                I_00p(ind)=i+(j-1)*N+(k)*N*M;               %Second upper interaction layer index
+                I_00m(ind)=i+(j-1)*N+(k-2)*N*M;             %Second lower interaction layer index
+
+                r(ind)=rs(k);                               %build the r values needed for the coefficients
+                theta(ind)=thetas(j);                       %build the theta values needed for the coefficients
+                %Coefficients for finite difference formula
+                w(ind)=(((-2*r(ind)^2*sin(theta(ind))^2)/(hr_k+hr_km1))*(1/hr_k+1/hr_km1)+  (-2/(hphi_i+hphi_im1))*(1/hphi_i+1/hphi_im1) + ((-2*sin(theta(ind))^2)/(htheta_j+htheta_jm1))*(1/htheta_j+1/htheta_jm1));
+                A_p(ind)=((2*r(ind)^2*sin(theta(ind))^2)/(hr_k+hr_km1))*(1/hr_k) +(2*r(ind)*sin(theta(ind))^2)/(hr_k+hr_km1); 
+                A_m(ind)=((2*r(ind)^2*sin(theta(ind))^2)/(hr_k+hr_km1))*(1/hr_km1)-(2*r(ind)*sin(theta(ind))^2)/(hr_k+hr_km1);  
+                B_p(ind)=(2/(hphi_i+hphi_im1))*(1/hphi_i);
+                B_m(ind)=(2/(hphi_i+hphi_im1))*(1/hphi_im1);
+                C_p(ind)=((2*sin(theta(ind))^2)/(htheta_j+htheta_jm1))*(1/htheta_j)+cos(theta(ind))*sin(theta(ind))/(htheta_j+htheta_jm1); 
+                C_m(ind)=((2*sin(theta(ind))^2)/(htheta_j+htheta_jm1))*(1/htheta_jm1)-cos(theta(ind))*sin(theta(ind))/(htheta_j+htheta_jm1);           
+            end
+        end
+    end  
+
+    %Place coefficients into proper locations in A matrix
+    A=A+sparse(I_000,I_000,w,P,P);
+    A=A+sparse(I_000,I_p00,B_p,P,P);
+    A=A+sparse(I_000,I_m00,B_m,P,P);
+    A=A+sparse(I_000,I_0p0,C_p,P,P);
+    A=A+sparse(I_000,I_0m0,C_m,P,P);
+    A=A+sparse(I_000,I_00p,A_p,P,P);
+    A=A+sparse(I_000,I_00m,A_m,P,P);
+    R(I_000)=r.^2.*(sin(theta).^2).*f(I_000);
+    disp(['Insides setup in ',num2str(toc), ' secs']);
+
+    %*********
+    % 2) INSIDE 0<=phi<=2pi, cones at theta=0 and pi, 0<r<R_max here we
+    % need a special equation because of the singular Jacobian for theta=0
+    % and theta=pi
+    %*********
+    
+    %initialize index and coefficient variables
+    ind=0;  
+    dV_j0=zeros(O-2,1);             %coefficient for j=0
+    dV_jM=zeros(O-2,1);             %coefficient for j=M
+    I_000=zeros(O-2,1);             %main diagonal index
+    I_00m=zeros(O-2,1);             %Second lower interaction layer index
+    I_00p=zeros(O-2,1);             %Second upper interaction layer index
+    I_000i=zeros(N*(O-2),1);        
+    I_i20=zeros(N*(O-2),1);
+    I_000_M=zeros(O-2,1);           %these indicies are the same as above,
+    I_00m_M=zeros(O-2,1);           %but for j=M
+    I_00p_M=zeros(O-2,1);
+    I_000_Mi=zeros(N*(O-2),1);
+    I_i20_M=zeros(N*(O-2),1);
+    coeff_u000_j0=zeros(O-2,1);     %all of these coefficients depend on what
+    coeff_u00p_j0=zeros(O-2,1);     %index you are at, hence the similar notation
+    coeff_u00m_j0=zeros(O-2,1);     %between them and indicies.
+    coeff_ui20_j0=zeros(O-2,1);
+    coeff_u000_jM=zeros(O-2,1);
+    coeff_u00p_jM=zeros(O-2,1);
+    coeff_u00m_jM=zeros(O-2,1);
+    coeff_ui20_jM=zeros(O-2,1);
+    htheta_j0=htheta(1);            %theta space step at j=0
+    htheta_jM=htheta(end);          %theta space step at j=M
+    hphiss=hphi;                    %phi space steps
+    hphiss(N)=hphi(1);              %make the last space step equal to the first
+
+    %Now make the coefficients
+    for k=2:1:O-1
+        hr_k=hr(k);                 %space step in r at k
+        hr_km1=hr(k-1);             %space step in r at k-1
+
+        ind=ind+1;
+        r=rs(k);                                                            %rs for coefficients
+        r_plus=r+hr_k/2;r_minus=r-hr_km1/2;                                 
+        %coefficients for j=0
+        dV_j0(ind)=(1/3)*pi*(0.5*htheta_j0)^2*( r_plus^3-r_minus^3);        %see paper for details
+        dA_j0=r*0.5*(hr_k+hr_km1)*(0.5*htheta_j0);                          %regarding these coefficents
+        S_up_j0=pi*r_plus^2*(0.5*htheta_j0)^2;
+        S_down_j0=pi*r_minus^2*(0.5*htheta_j0)^2;
+        %coefficients for j=M
+        dV_jM(ind)=(1/3)*pi*(0.5*htheta_jM)^2*( r_plus^3-r_minus^3);        %same as above
+        dA_jM=r*0.5*(hr_k+hr_km1)*(0.5*htheta_jM);
+        S_up_jM=pi*r_plus^2*(0.5*htheta_jM)^2;
+        S_down_jM=pi*r_minus^2*(0.5*htheta_jM)^2;
+
+        %theta=0. only for phi=0
+        I_000(ind)=1+(1-1)*N+(k-1)*N*M; 
+        I_00m(ind)=1+(1-1)*N+(k-2)*N*M; 
+        I_00p(ind)=1+(1-1)*N+(k)*N*M; 
+        %theta=Pi. only for phi=0
+        I_000_M(ind)=1+(M-1)*N+(k-1)*N*M;           
+        I_00m_M(ind)=1+(M-1)*N+(k-2)*N*M; 
+        I_00p_M(ind)=1+(M-1)*N+(k)*N*M;
+        %now put all the coefficients together to create those for the A
+        %matrix (A*x=R)
+        coeff_u000_j0(ind)=-((S_up_j0/hr_k)+(S_down_j0/hr_km1) +sum(hphiss)*dA_j0/(r*htheta_j0));
+        coeff_u00p_j0(ind)=(S_up_j0)/hr_k;
+        coeff_u00m_j0(ind)=(S_down_j0)/hr_km1;
+        coeff_u000_jM(ind)=-((S_up_jM/hr_k)+(S_down_jM/hr_km1) +sum(hphiss)*dA_jM/(r*htheta_jM));
+        coeff_u00p_jM(ind)=(S_up_jM)/hr_k;
+        coeff_u00m_jM(ind)=(S_down_jM)/hr_km1;
+        
+        %these coefficients are for all the i terms (phis) for each j, we
+        %need to make coefficients for all the phis.
+        i=1:1:N;
+        coeff_ui20_j0(i+(ind-1)*N)=dA_j0*hphiss(i)/(r*htheta_j0);
+        coeff_ui20_jM(i+(ind-1)*N)=dA_jM*hphiss(i)/(r*htheta_jM);
+        I_000i(i+(ind-1)*N)=I_000(ind);
+        I_000_Mi(i+(ind-1)*N)=I_000_M(ind);
+        I_i20(i+(ind-1)*N)=i+(2-1)*N+(k-1)*N*M; 
+        I_i20_M(i+(ind-1)*N)=i+((M-1)-1)*N+(k-1)*N*M;  
+    end
+    %now put all the coefficients into the places they belong
+    R(I_000)=dV_j0.*f(I_000); 
+    R(I_000_M)=dV_jM.*f(I_000_M); 
+    A=A+sparse(I_000,I_000,coeff_u000_j0,P,P);              %main diagonal for j=0
+    A=A+sparse(I_000,I_00p,coeff_u00p_j0,P,P);              %second upper interaction for j=0
+    A=A+sparse(I_000,I_00m,coeff_u00m_j0,P,P);              %second lower interaction for j=0
+    A=A+sparse(I_000_M,I_000_M,coeff_u000_jM,P,P);          %main diagonal for j=M
+    A=A+sparse(I_000_M,I_00p_M,coeff_u00p_jM,P,P);          %second upper interaction for j=M
+    A=A+sparse(I_000_M,I_00m_M,coeff_u00m_jM,P,P);          %second lower interaction for j=M
+    A=A+sparse(I_000i,I_i20,coeff_ui20_j0,P,P);             %phi terms for j=0
+    A=A+sparse(I_000_Mi,I_i20_M,coeff_ui20_jM,P,P);         %phi terms for j=M
+    
+    %yes that's right, only (roughly) half way there for setting up the theta terms!
+    disp(['50% of theta relations complete in ',num2str(toc), ' secs']);
+
+    %Now equate values of u for all phis on up and down parts of z-axis
+    ind=0;
+    PP=(N-1)*(O-2);
+    I_axis=zeros(PP,1);
+    I_axis_M=zeros(PP,1);
+    I_000=zeros(PP,1);
+    I_000_M=zeros(PP,1);
+    for k=2:1:O-1
+        ind=ind+1;
+        i=2:1:N;
+        I_axis(i-1+(ind-1)*(N-1))=1+(1-1)*N+(k-1)*N*M;          %equate phis for j=0 at main diagonal
+        I_axis_M(i-1+(ind-1)*(N-1))=1+(M-1)*N+(k-1)*N*M;        %equate phis for j=M at main diagonal
+        I_000(i-1+(ind-1)*(N-1))=i+(1-1)*N+(k-1)*N*M;           %indicies for phis for j=0
+        I_000_M(i-1+(ind-1)*(N-1))=i+(M-1)*N+(k-1)*N*M;         %indicies for phis for j=M
+    end
+    %Now place the coefficients into their places
+    A=A+sparse(I_000,I_000,1,P,P);              %here we are setting everything equal to the main diagonal again
+    A=A+sparse(I_000,I_axis,-1,P,P);            %along lines of theta = {0,pi}, phis don't matter, so set them to
+    A=A+sparse(I_000_M,I_000_M,1,P,P);          %be all the same.
+    A=A+sparse(I_000_M,I_axis_M,-1,P,P);
+    R(I_000)=0.0;                               %again this only works if R is zero for these.
+    R(I_000_M)=0.0;
+
+    disp(['Theta relations complete in ',num2str(toc), ' secs']);
+
+    %***********
+    % 3) INSIDE phi=0, theat=0, r=0
+    %a) use theta=phi=0; 
+    %***********
+    
+    dV=(4/3)*pi*(0.5*hr(1))^3;          %one of the phi coefficients
+    I_curr=zeros((M-2)*(N),1);          %index for main diagonal
+    dA=zeros((M-2)*(N),1);              %another phi coefficient
+    ind=0;
+    for j=2:1:M-1
+         for i=1:1:N
+             ind=ind+1;
+             if (i==N)
+                 hphi_i=hphi(i-1);      %set last phi space step equal to second last
+             else
+                 hphi_i=hphi(i);        %array of phi space steps
+             end
+             I_curr(ind)=i+(j-1)*N+(2-1)*N*M;
+             dA(ind)=(0.5*hr(1))^2.*sin(htheta(j)).*htheta(j).*hphi_i;  %generate the coefficent
+         end
+    end
+    dAprime_top=2*pi*(0.5*hr(1))^2*(1-cos(htheta(1)));              %see the paper for more
+    dAprime_bottom=2*pi*(0.5*hr(1))^2*(1-cos(htheta(end)));         %details on these
+    coeff_u_center=-( sum(dA) + dAprime_top + dAprime_bottom );     %now put them all together
+    I_000=1+(1-1)*N+(1-1)*N*M;  
+             % -- coef at center
+    R(I_000)=dV*f(I_000);                    
+    A=A+sparse(I_000,I_000,coeff_u_center,P,P);
+             % -- coefs through top and bottom 
+    I_top=1+(1-1)*N+(2-1)*N*M;                          %2nd point in radial dir: k=2
+    I_bot=1+(M-1)*N+(2-1)*N*M;                          %2nd point in radial dir: k=2
+    coeff_u_top=dAprime_top;                            %as in paper; multiplied by hr
+    coeff_u_bottom=dAprime_bottom;
+    A=A+sparse(I_000,I_top,coeff_u_top,P,P);
+    A=A+sparse(I_000,I_bot,coeff_u_bottom,P,P);
+             % -- coefs through sides
+    coeff_sides=dA ;
+    A=A';                                           %it is faster to transpose A matrix and 
+    A=A+sparse(I_curr,I_000,coeff_sides,P,P);       %then perform a column operation and then
+    A=A';                                           %transpose it back (row operations are slow)
+    
+    %**********
+    %b) set all others to equal that.
+    %**********
+    ind=0;
+    I_curr=zeros((M)*(N),1);
+    for j=1:1:M
+         for i=1:1:N
+             ind=ind+1;
+               I_curr(ind)=i+(j-1)*N+(1-1)*N*M;     %generate the index for the phis
+         end
+    end
+    A=A+sparse(I_curr,I_curr,1,P,P);                %again, we need to set all phis equal to one
+    A=A+sparse(I_curr,I_000,-1,P,P);                %another as they don't matter at r=0
+    R(I_curr)=0.0;
+    
+    %Whew... Now we just need the Boundary Conditions!
+    disp(['R=0 relations complete in ',num2str(toc), ' secs']);
+
+    %*********
+    % 4) INSIDE 0<=phi<=2pi, 0<theta<pi, r=R_max
+    %   Boundary Conditions
+    %*********
+    %Initialize first
+    ind=0;
+    I_curr=zeros(M*N,1);
+    I_prev=zeros(M*N,1);
+    DirBC_val=zeros(M*N,1);
+    prev_value=zeros(M*N,1);
+    num_pts_trap=0;
+    DiriBC_handle=str2func(DiriBC);             %create handler for DiriBC function
+    DiriBC=DiriBC_handle(phis,thetas);          %call DiriBC function
+    NeumBC_handle=str2func(NeuBC);              %create handler for NeuBC function
+    NeumBC=NeumBC_handle(phis,thetas);          %call NeuBC function
+    any_dirichlet=0;                            %constant that ends up zero if all BC are neumann
+    for j=1:1:M
+        for i=1:1:N
+            ind=ind+1;
+               I_curr(ind)=i+(j-1)*N+(O-1)*N*M; 
+               I_prev(ind)=i+(j-1)*N+(O-2)*N*M;
+
+               if ( ~isnan(DiriBC(i,j))) 
+                   %Constants if Dirichlet BC is found. (Dirichlet
+                   %overrides Neumann)
+                   any_dirichlet=any_dirichlet + 1;
+                   DirBC_val(ind)=DiriBC(i,j);
+                   prev_value(ind)=0.0;
+                   num_pts_trap=num_pts_trap+1;
+               else
+                   %Constants if Neumann BC
+                   DirBC_val(ind)=hr(end)*NeumBC(i,j);
+                   prev_value(ind)=-1.0;
+               end
+        end
+    end
+    A=A+sparse(I_curr,I_curr,1,P,P);            %Put the BCs where they should go
+    R(I_curr)=DirBC_val;                   
+    A=A+sparse(I_curr,I_prev,prev_value,P,P);
+
+    %Done! Now we can solve it.
+    disp(['BCs complete in ',num2str(toc), ' secs']);
+
+    %*******
+    %Now we can solve the matrix equation
+    %*******
+    disp('     Solving....');
+    if (useiter==0)
+        disp('     Using mldivide');
+        x=A\R;                                  %Use mldivide (quick only if you have lots of RAM)
+        relres=max(abs(R-A*x));                 %Calculate the residual
+        iter=0;                                 %Since we didn't use iterative method, let
+        resvec='mat';                           %these variables reflect that.
+    else
+        setup.type = 'nofill';                  %variable for preconditioners
+        [L,U] = ilu(A,setup);                   % GENERATES PRECONDITIONERS TO SPEED UP bicgstab ITERATIONS
+        [x flag relres iter resvec]=bicgstab(A,R,0.0001,100000,L,U,ones(P,1));%tol 0.000001 and 0.0001: no difference in comp. time!
+    end
+
+    %********
+    %Now format the solution for plotting
+    %********
+    u=reshape(x,N,M,O);                         %reshape into matrix
+    u(N+1,:,:)=u(1,:,:);                        %Add extra point at phi=2*pi so that when plotting, one sees completed circle
+    phis(N+1)=phis(1);
+    if (any_dirichlet == 0)                     %if only neumann BCs then set minimum value of u to 0
+        u=u-(min(min(min(u))));
+    end
+    xs=zeros(N+1,M,O);
+    ys=xs;
+    zs=ys;
+
+    %Generate xs, ys, and zs for plotting the sphere
+    for k=1:1:O
+        xs(:,:,k) = rs(k)*cos(phis')*sin(thetas);
+        ys(:,:,k) = rs(k)*sin(phis')*sin(thetas);
+        zs(:,:,k) = rs(k)*ones(N+1,1)*cos(thetas);
+    end
+    %change order of entries in u for plotting
+    u=permute(u,[3,2,1]);
+    xs=permute(xs,[3 2 1]);
+    ys=permute(ys,[3 2 1]);
+    zs=permute(zs,[3 2 1]);
+
+    disp(['Complete in ',num2str(toc), ' secs']);
+    
+end

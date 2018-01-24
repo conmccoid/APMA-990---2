@@ -1,0 +1,21 @@
+
+**********************************************************
+SAMPLE INPUT FOR ONE TEST RUN. RECTANGULAR SOLVER EXAMPLE.
+**********************************************************
+	Ensure that your working directory in Matlab is set to the directory called "example_rectangle" (it is located in the same directory as this readme file).
+
+	Next, execute the following commands in the command line of Matlab:
+
+		[xs ys v relres iter resvec] = square_2d_poisson(1, 2, 100, 100, 'x_refine_function','y_refine_function','dirichlet_boundary','neumann_boundary','forcing');
+
+		figure(1);surf(xs,ys,v,'EdgeColor','none');
+
+		[xs ys u_diff u_a] = compare_num_analy(xs,ys,v);
+
+		figure(2);surf(xs,ys,u_diff,'EdgeColor','none');
+
+	Figure 1 should look like "u_chair_100x100.eps" and figure 2 should look like "error_chair_100x100.eps".
+	The analytic equation for the "chair" function may be found in "chair_function_formula.txt"
+
+
+END OF README

@@ -1,0 +1,71 @@
+-- FreeFem++ v  3.560000 (date jeu. 20 juil. 2017 19:05:27)
+ Load: lg_fem lg_mesh lg_mesh3 eigenvalue
+    1 : verbosity=0.;
+    2 : real Dx=.02,Dy=.02;
+    3 : mesh Th=square(floor(3./Dx),floor(4./Dy));
+    4 : fespace Vh(Th,P1);
+    5 : Vh uh,vh,uh0=10.;
+    6 : real ue = 4., mu = 1., alpha=.001, dt=0.01, Tf=10. ;
+    7 : func f=[sin(pi*x)*sin(2*pi*y)];
+    8 :  macro Grad(u )  [dx(u),dy(u)]//
+    9 : problem chaleur(uh,vh) = int2d(Th)(uh*vh/dt +  [dx(uh),dy(uh)]'*[dx(vh),dy(vh)]*mu) - int2d(Th)(uh0*vh/dt + f*vhPýl) error operator +  <10LinearCombI6MDroit4C_F0E>, <7E_Array>
+ List of choices
+         (        <l> :   <l>, <l> )
+         (        <8listMesh> :   <8listMesh>, <N5Fem2D4MeshE> )
+         (        <8listMesh> :   <N5Fem2D4MeshE>, <N5Fem2D4MeshE> )
+         (        <NSt7__cxx114listI7tripletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_EEE> :   <14Matrice_CreuseISt7comPýlplexIdEE>, <14Matrice_CreuseISt7complexIdEE> )
+         (        <NSt7__cxx114listI7tripletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_EEE> :   <14Matrice_CreuseISt7comPýlplexIdEE>, <NSt7__cxx114listI7tripletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_EEE> )
+         (        <NSt7__cxx114listI7tripletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_EEE> :   <NSt7__cxx114listI7triplPýletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_EEE>, <14Matrice_CreuseISt7complexIdEE> )
+         (        <NSt7__cxx114listI7tripletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_EEE> :   <NSt7__cxx114listI7triplPýletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_EEE>, <NSt7__cxx114listI7tripletISt7complexIdEP13MatriceCreuseIS3_EbESaIS7_PýlEEE> )
+         (        <NSt7__cxx114listI7tripletIdP13MatriceCreuseIdEbESaIS5_EEE> :   <14Matrice_CreuseIdE>, <14Matrice_CreuPýlseIdE> )
+         (        <NSt7__cxx114listI7tripletIdP13MatriceCreuseIdEbESaIS5_EEE> :   <14Matrice_CreuseIdE>, <NSt7__cxx114liPýlstI7tripletIdP13MatriceCreuseIdEbESaIS5_EEE> )
+         (        <NSt7__cxx114listI7tripletIdP13MatriceCreuseIdEbESaIS5_EEE> :   <NSt7__cxx114listI7tripletIdP13MatricePýlCreuseIdEbESaIS5_EEE>, <14Matrice_CreuseIdE> )
+         (        <NSt7__cxx114listI7tripletIdP13MatriceCreuseIdEbESaIS5_EEE> :   <NSt7__cxx114listI7tripletIdP13MatricePýlCreuseIdEbESaIS5_EEE>, <NSt7__cxx114listI7tripletIdP13MatriceCreuseIdEbESaIS5_EEE> )
+         (        <6C_args> :   <6C_args>, <6C_args> )
+         (        <10LinearCombI7MGauche4C_F0E> :   <10LinearCombI7MGauche4C_F0E>, <10LinearCombI7MGauche4C_F0E> )
+         (        <10LinearCombI6MDroit4C_F0E> :   <10LinearCombI6MDroit4C_F0E>, <10LinearCombI6MDroit4C_F0E> )
+         (        <10LinearCombISt4pairI7MGauche6MDroitE4C_F0E> :   <10LinearCombISt4pairI7MGauche6MDroitE4C_F0E>, <10LiPýlnearCombISt4pairI7MGauche6MDroitE4C_F0E> )
+         (        <4C_F0> :   <12TransE_Array>, <12TransE_Array> )
+         (        <4C_F0> :   <7E_Array>, <12TransE_Array> )
+         (        <4C_F0> :   <7E_Array>, <7E_Array> )
+         (        <4C_F0> :   <12TransE_Array>, <7E_Array> )
+         (        <9E_BorderN> :   <9E_BorderN>, <9E_BorderN> )
+         (        <12Add_Mulc_KN_ISt7complexIdEE> :   <8Mulc_KN_ISt7complexIdEE>, <3KN_ISt7complexIdEE> )
+         (        <12Add_Mulc_KN_ISt7complexIdEE> :   <3KN_ISt7complexIdEE>, <8Mulc_KN_ISt7complexIdEE> )
+         (        <12Add_Mulc_KN_ISt7complexIdEE> :   <8Mulc_KN_ISt7complexIdEE>, <8Mulc_KN_ISt7complexIdEE> )
+         (        <7Add_KN_ISt7complexIdEE> :   <3KN_ISt7complexIdEE>, <3KN_ISt7complexIdEE> )
+         (        <12Add_Mulc_KN_IdE> :   <8Mulc_KN_IdE>, <3KN_IdE> )
+         (        <12Add_Mulc_KN_IdE> :   <3KN_IdE>, <8Mulc_KN_IdE> )
+         (        <12Add_Mulc_KN_IdE> :   <8Mulc_KN_IdE>, <8Mulc_KN_IdE> )
+         (        <7Add_KN_IdE> :   <3KN_IdE>, <3KN_IdE> )
+         (        <12Add_Mulc_KN_IlE> :   <8Mulc_KN_IlE>, <3KN_IlE> )
+         (        <12Add_Mulc_KN_IlE> :   <3KN_IlE>, <8Mulc_KN_IlE> )
+         (        <12Add_Mulc_KN_IlE> :   <8Mulc_KN_IlE>, <8Mulc_KN_IlE> )
+         (        <7Add_KN_IlE> :   <3KN_IlE>, <3KN_IlE> )
+         (        <St7complexIdE> :   <St7complexIdE> )
+         (        <l> :   <l> )
+         (        <d> :   <d> )
+         (        <St7complexIdE> :   <b>, <St7complexIdE> )
+         (        <St7complexIdE> :   <St7complexIdE>, <b> )
+         (        <NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE> :   <NSt7__cxx1112basic_stringIcSt11char_traitsPýlIcESaIcEEE>, <NSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE> )
+         (        <St7complexIdE> :   <l>, <St7complexIdE> )
+         (        <St7complexIdE> :   <St7complexIdE>, <l> )
+         (        <St7complexIdE> :   <d>, <St7complexIdE> )
+         (        <St7complexIdE> :   <St7complexIdE>, <d> )
+         (        <St7complexIdE> :   <St7complexIdE>, <St7complexIdE> )
+         (        <l> :   <b>, <l> )
+         (        <l> :   <l>, <b> )
+         (        <l> :   <b>, <b> )
+         (        <d> :   <l>, <d> )
+         (        <d> :   <d>, <l> )
+         (        <d> :   <d>, <d> )
+ 
+ Error line number 9, in file C:\Users\Dave\Google Drive\SFU\Math\APMA 990 - 2\HW1\Sadaka_Heat.edp, before  token )
+ 
+  current line = 9
+Compile error :
+        line number :9, )
+error Compile error :
+        line number :9, )
+ code = 1 mpirank: 0
+ try getConsole C:\Users\Dave\Google Drive\SFU\Math\APMA 990 - 2\HW1\Sadaka_Heat.edp

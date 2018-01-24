@@ -1,2 +1,15 @@
-mesh Th = square(30,40,[0 + 3*x, 0 + 4*y]);
-plot(Th);
+mesh Th = square(60,80,[0 + 3*x, 0 + 4*y]);
+fespace Vh(Th,P1);
+macro Gauss(x,y,x0,y0,a,b)[a*exp(-( (x-x0)^2 + (y-y0)^2)/b)]//
+Vh u,v, u0=20*(x<=1.5 & y<=2);//u0=Gauss(x,y,0,0,2,1) + Gauss(x,y,0,4,1,0.5) + Gauss(x,y,3,0,-1,0.75) + Gauss(x,y,3,4,-2,2);
+real dt=0.01, mu=1;
+macro Grad(u)[dx(u),dy(u)]//
+
+plot(u0,wait=true);
+for (real t=0.; t<5.; t+=dt) {
+	func f = sin(t)*sin(pi*x)*sin(2*pi*y);
+	solve Heat(u,v) = int2d(Th)(u*v/dt + mu*Grad(u)'*Grad(v)) - int2d(Th)(u0*v/dt + f*v)
+			+ on(1,2,3,4,u=0);;
+	u0=u;
+	plot(u);
+}

@@ -1,0 +1,22 @@
+-- FreeFem++ v  3.560000 (date jeu. 20 juil. 2017 19:05:27)
+ Load: lg_fem lg_mesh lg_mesh3 eigenvalue
+    1 : border G (t=0,2*pi){x=cos(t);y=sin(t);};
+    2 : mesh Th=buildmesh(G(100));
+    3 : fespace Vh(Th,P2);
+    4 : Vh uh,vh; // unkown and test function.
+    5 : func f=0; // right hand side function
+    6 : problem laplace(uh,vh) = // definion of the problem
+    7 : int2d(Th)( dx(uh)*dx(vh) + dy(uh)*dy(vh) )
+    8 : + on(uh=f);
+    9 : ;
+   10 : laplace; // solve the problem plot(uh); // to see the result
+   11 : plot(uh,ps="period.eps",value=true); sizestack + 1024 =1512  ( 488 )
+ 
+  --  mesh:  Nb of Triangles =   1740, Nb of Vertices 921
+  -- Solve :
+          min 0  max 0
+times: compile 0.047s, execution 1.205s,  mpirank:0
+ ######## We forget of deleting   35 Nb pointer,   0Bytes  ,  mpirank 0, memory leak =0
+ CodeAlloc : nb ptr  2677,  size :365688 mpirank: 0
+Ok: Normal End
+ try getConsole C:\Users\Dave\Google Drive\SFU\Math\APMA 990 - 2\poisson.edp
