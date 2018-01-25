@@ -11,7 +11,6 @@ UU = @(t,r) 0;
 for k = 2:100
     UU = @(t,r) UU(t,r) + UUk(t,r,k);
 end
-% UU = @(t,r) (r.^2).*cos(2*t)/2 + (r.^3).*cos(3*t)/6 + (r.^4).*cos(4*t)/12;
 uu = diskfun(UU,'polar');
 
 % BC
