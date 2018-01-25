@@ -1,11 +1,12 @@
 border G (t=0,2*pi){x=cos(t);y=sin(t);};
 mesh Th=buildmesh(G(100));
 fespace Vh(Th,P2);
-Vh uh,vh; // unkown and test function.
-func f=0; // right hand side function
-problem laplace(uh,vh) = // definion of the problem
-int2d(Th)( dx(uh)*dx(vh) + dy(uh)*dy(vh) )
-+ on(uh=f);
-;
-laplace; // solve the problem plot(uh); // to see the result
-plot(uh,ps="period.eps",value=true);
+Vh uh,vh;
+func t=atan(y/x);
+// func fk(x,y,k)=cos(k*atan(y/x))/(k*(k-1));
+// func f=fk(x,y,2);
+func f=cos(2*t)/2 + cos(3*t)/6 + cos(4*t)/12 + cos(5*t)/20;
+solve laplace(uh,vh) = 
+	int2d(Th)( dx(uh)*dx(vh) + dy(uh)*dy(vh) )
+	+ on(G,uh=f);
+plot(uh,fill=1,value=true);

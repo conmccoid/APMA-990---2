@@ -3,20 +3,17 @@
     1 : border G (t=0,2*pi){x=cos(t);y=sin(t);};
     2 : mesh Th=buildmesh(G(100));
     3 : fespace Vh(Th,P2);
-    4 : Vh uh,vh; // unkown and test function.
-    5 : func f=0; // right hand side function
-    6 : problem laplace(uh,vh) = // definion of the problem
-    7 : int2d(Th)( dx(uh)*dx(vh) + dy(uh)*dy(vh) )
-    8 : + on(uh=f);
-    9 : ;
-   10 : laplace; // solve the problem plot(uh); // to see the result
-   11 : plot(uh,ps="period.eps",value=true); sizestack + 1024 =1512  ( 488 )
+    4 : Vh uh,vh;
+    5 : func t=atan(y/x);
+    6 : // func fk(x,y,k)=cos(k*atan(y/x))/(k*(k-1));
+    7 : // func f=fk(x,y,2);
+    8 : func f=cos(2*t)/2 + cos(3*t)/6 + cos(4*t)/12;
+    9 : solve laplace(uh,vh) =
+   10 :         int2d(Th)( dx(uh)*dx(vh) + dy(uh)*dy(vh) )
+   11 :         + on(G,uh=f);
+   12 : plot(uh,fill=1,value=true); sizestack + 1024 =1512  ( 488 )
  
   --  mesh:  Nb of Triangles =   1740, Nb of Vertices 921
   -- Solve :
-          min 0  max 0
-times: compile 0.047s, execution 1.205s,  mpirank:0
- ######## We forget of deleting   35 Nb pointer,   0Bytes  ,  mpirank 0, memory leak =0
- CodeAlloc : nb ptr  2677,  size :365688 mpirank: 0
-Ok: Normal End
- try getConsole C:\Users\Dave\Google Drive\SFU\Math\APMA 990 - 2\poisson.edp
+          min -0.513593  max 0.75
+times: compile 0.047s, execution 0.081s,  mpirank:0

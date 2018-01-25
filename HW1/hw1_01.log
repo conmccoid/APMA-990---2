@@ -1019,7 +1019,7 @@
           min -0.0193659  max 0.0212203
   -- Solve :
           min -0.0193163  max 0.0211393
-times: compile 0.063s, execution 41.574s,  mpirank:0
+times: compile 0.078s, execution 43.742s,  mpirank:0
  ######## We forget of deleting   5030 Nb pointer,   0Bytes  ,  mpirank 0, memory leak =0
  CodeAlloc : nb ptr  2778,  size :370360 mpirank: 0
 Ok: Normal End
